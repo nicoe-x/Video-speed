@@ -1,23 +1,24 @@
-# Video Speed · 视频倍速工坊
+# 视频倍速工坊
 
-用于 Windows 10/11 64 位的本地视频批量倍速工具。选择视频或文件夹，设置统一倍速，即可批量处理并保存为 MP4。所有处理在本机完成，无需账号或网络服务。
+批量给视频调倍速的 Windows 小工具。把视频加进列表，选好速度和保存位置，点一次开始就能依次处理。原文件保留，结果另存为 MP4。
 
-## 功能
+支持 Windows 10 / 11（64 位），视频都在本机处理。
 
-- 批量添加视频、导入文件夹，可包含子文件夹并自动去重。
-- 支持 **0.25～16 倍速**，提供常用倍速快捷选项。
-- 默认保留音轨并尽量保持音调，可选择静音导出。
-- 高画质、标准、小体积三种编码质量。
-- 可选择保存目录，原视频保留，同名输出自动编号。
-- 进度显示、中途停止、失败后继续处理及处理日志。
+## 怎么用
 
-支持 MP4、MOV、MKV、AVI、WMV、FLV、WebM、M4V、MTS、M2TS 等 FFmpeg 可解码的视频文件。输出为 H.264 / AAC 编码的 MP4。
+点击「添加视频」可以一次选多个文件，也可以直接添加整个文件夹。文件夹默认连同子目录一起扫描，重复文件只添加一次。
+
+倍速范围是 0.25～16。比如一段 10 分钟的视频，设为 2 倍速，处理后大约是 5 分钟；设为 0.5 倍速，就是慢放到大约 20 分钟。默认保留声音，也可以打开「静音导出」。
+
+没有改保存位置的话，结果会放在第一个视频旁边的「倍速输出」文件夹里。文件名会带上倍速，重名时自动加编号。
+
+详细操作见 [使用说明](使用说明.md)。
 
 ## 从源码运行
 
-安装 Python 3.13，以及可从 PATH 调用的 `ffmpeg` 和 `ffprobe`。FFmpeg 可从 [FFmpeg 官网](https://ffmpeg.org/download.html) 获取，Windows 构建可参考 [Gyan builds](https://www.gyan.dev/ffmpeg/builds/)。本仓库不包含 FFmpeg 二进制文件。
+需要 Python 3.13、FFmpeg 和 FFprobe。先确认终端能运行 `ffmpeg -version` 和 `ffprobe -version`。Windows 的 FFmpeg 可以从 [Gyan builds](https://www.gyan.dev/ffmpeg/builds/) 下载，仓库里没有附带这些程序。
 
-在 PowerShell 中运行：
+在 PowerShell 里执行：
 
 ```powershell
 git clone https://github.com/nicoe-x/Video-speed.git
@@ -27,44 +28,38 @@ python -m venv .venv
 .\.venv\Scripts\python.exe app.py
 ```
 
-使用方式：**添加视频 / 文件夹 → 设置倍速 → 选择保存位置 → 开始批量处理**。
+## 打包
 
-默认输出至第一个视频所在文件夹的「倍速输出」目录。已完成文件会保留；停止时删除正在处理的临时文件。
-
-## 打包 Windows 便携版
-
-完成上面的环境准备后，在 PowerShell 中运行：
+装好上面的依赖后运行：
 
 ```powershell
 .\build.ps1
 ```
 
-输出位于 `dist/视频倍速工坊/`。双击该文件夹中的 EXE 即可使用，无需另外安装 Python 或 FFmpeg。发布时请分发完整文件夹，保留 `_internal`、许可文件及第三方声明。
+打包结果在 `dist/视频倍速工坊/`，里面的 EXE 可以直接运行。拷贝给别人时，要把整个文件夹一起带上，包括 `_internal` 和许可证文件。便携版自带 Python 运行环境及 FFmpeg。
 
-打包脚本从 PATH 获取 FFmpeg 和 FFprobe，并从其安装目录的上一级复制 `LICENSE`，适用于 Gyan essentials 的目录结构。其他来源的 FFmpeg 构建需要相应调整许可证收集路径。分发第三方工具时，须遵守该构建及其依赖的许可条件。
+脚本按 Gyan essentials 的目录结构收集 FFmpeg 许可证：`bin` 文件夹里放程序，上一级放 `LICENSE`。如果用的是其他构建，请调整 `build.ps1` 中对应的路径。
 
-## 验证
+## 测试
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest -v test_conversion
 ```
 
-测试自动生成短视频，验证倍速与音画时长、静音与无音轨输入、重名保护、取消清理、异常文件和文件夹扫描。不会使用个人视频。
+测试会临时生成视频，检查倍速、音画时长、静音、重名保存、取消任务和损坏文件等情况。
 
-`verify_ui.py` 另提供桌面交互流程验证，需要真实 Windows 桌面。其截图步骤需要系统 `python` 安装 Pillow（`python -m pip install Pillow`）。测试产物写入被 Git 忽略的 `validation/` 文件夹。
+界面测试用 `verify_ui.py`，需要 Windows 桌面环境。截图还需要系统 `python` 装有 Pillow：`python -m pip install Pillow`。测试文件和截图保存在 `validation/`，不会提交到仓库。
 
-## 范围与限制
+## 几个需要注意的地方
 
-- 倍速处理会重新编码，文件体积和画质可能变化。
-- 导出第一路普通视频画面及所有可解码音轨；不导出字幕、章节及额外视频轨。
-- 帧率上限为 60fps；慢放使用重复画面，不进行运动插帧。
-- 输出为 8 位编码，HDR / 杜比视界素材不保证保持原有色彩，建议先验证效果。
-- 再次开始会重新处理整个列表；重试部分文件前可移除其他项目。
+调倍速要重新编码，画质和文件大小会有变化。输出使用 H.264 / AAC，最高 60fps；慢放靠重复画面实现，没有插帧。
 
-更多说明见 [使用说明](使用说明.md)。
+带多条音轨的视频会保留音轨，但只导出第一路普通视频画面，不带字幕和章节。HDR、杜比视界素材的颜色可能变化，建议先试一段。
 
-## 开源许可
+点击停止会取消当前文件，已经处理好的文件会保留。再次开始会重跑整个列表，想单独重试几个文件的话，先把其他文件从列表移除。
 
-本项目原创源码与文档使用 **[Apache License 2.0](LICENSE)**，Copyright 2026 nicoe-x。
+## 许可证
 
-第三方软件保留各自许可证。FFmpeg 通过独立子进程调用；本地便携版所使用的 Gyan essentials 构建为 GPLv3，不因本项目的 Apache-2.0 许可而变更许可。第三方来源及说明见 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)。
+代码和文档采用 [Apache-2.0](LICENSE)。Copyright 2026 nicoe-x。
+
+FFmpeg 等第三方软件使用各自的许可证。便携版采用的 Gyan essentials 构建使用 GPLv3，具体来源见 [第三方声明](THIRD_PARTY_NOTICES.txt)。
