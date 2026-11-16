@@ -63,7 +63,6 @@ class App(ctk.CTk):
         header = ctk.CTkFrame(self, fg_color='transparent')
         header.grid(row=0, column=0, sticky='ew', padx=28, pady=(22, 16))
         self.label(header, '视频倍速工坊', 27, bold=True).pack(anchor='w')
-        self.label(header, '批量调整播放速度，让每一段视频按你的节奏播放。', 13, MUTED).pack(anchor='w', pady=(4, 0))
         body = ctk.CTkFrame(self, fg_color='transparent')
         body.grid(row=1, column=0, sticky='nsew', padx=28)
         body.grid_columnconfigure(0, weight=1)
