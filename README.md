@@ -26,7 +26,9 @@ python -m venv .venv
 .\build.ps1
 ```
 
-输出目录：`dist/视频倍速工坊/`。分发时保留整个目录，包含 `_internal` 和许可证文件。
+输出文件：`dist/视频倍速工坊.exe`。Python、FFmpeg 和 FFprobe 已打包进去，可单独运行。首次启动需要解压到系统临时目录，可能稍慢。
+
+许可证和说明同时生成在 `dist/许可证与说明.zip`，EXE 内也保留一份。
 
 脚本按 Gyan essentials 的目录结构复制 FFmpeg 许可证：程序在 `bin/`，`LICENSE` 在其上一级。使用其他构建时需修改对应路径。
 
