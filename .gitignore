@@ -1,0 +1,12 @@
+.venv/
+build/
+dist/
+release/
+validation/
+*.spec
+__pycache__/
+*.py[cod]
+tools/
+*.exe
+*.zip
+*.log

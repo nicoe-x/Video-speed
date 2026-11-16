@@ -1,0 +1,25 @@
+视频倍速工坊 - Third-party notices
+
+Original project source and documentation: Apache-2.0, Copyright 2026 nicoe-x.
+See LICENSE and NOTICE. Third-party components retain their own licenses.
+This source repository does not include FFmpeg/FFprobe binaries.
+The version information below describes the original local portable build;
+rebuilding with another FFmpeg installation may bundle a different version.
+
+FFmpeg / FFprobe: https://ffmpeg.org/
+Windows build: https://www.gyan.dev/ffmpeg/builds/
+Bundled version: 9.0.1 essentials_build (see ffmpeg -version for configuration).
+This build is GPL licensed. The bundled executables are unmodified.
+License text is provided in licenses/FFmpeg-LICENSE.txt.
+Source/build information: https://www.gyan.dev/ffmpeg/builds/
+Upstream source: https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz
+Filter reference: https://ffmpeg.org/ffmpeg-filters.html
+
+CustomTkinter: https://github.com/TomSchimansky/CustomTkinter (MIT)
+Darkdetect: https://github.com/albertosottile/darkdetect (BSD-3-Clause)
+Python: https://www.python.org/ (PSF license)
+Tcl/Tk: https://www.tcl.tk/ (BSD-style license)
+PyInstaller: https://pyinstaller.org/ (GPL with bootloader exception)
+Additional available package licenses are included in licenses/ and _internal/.
+
+All processing happens locally. No third-party account or network service is required.

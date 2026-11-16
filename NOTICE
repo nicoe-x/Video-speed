@@ -1,0 +1,11 @@
+Video Speed / 视频倍速工坊
+Copyright 2026 nicoe-x
+
+Original project source code and documentation are licensed under the
+Apache License, Version 2.0. See LICENSE.
+
+Third-party software retains its respective licenses.
+FFmpeg and FFprobe are invoked as separate command-line processes.
+They are not included in this source repository. When bundled in a portable
+distribution, their applicable licenses and notices must be preserved.
+See THIRD_PARTY_NOTICES.txt for third-party attribution and upstream links.
