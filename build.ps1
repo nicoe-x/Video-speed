@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 nicoe-x
+param([string]$OutputDirectory = 'dist')
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
+$distributionPath = if ([System.IO.Path]::IsPathRooted($OutputDirectory)) { $OutputDirectory } else { Join-Path $PSScriptRoot $OutputDirectory }
 $pythonPath = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $pythonPath)) { throw '请先建立 .venv 并安装 requirements.txt。' }
 $ffmpegPath = (Get-Command ffmpeg -ErrorAction Stop).Source
@@ -31,8 +33,8 @@ foreach ($licenseName in @('LICENSE.txt', 'LICENSE')) {
         break
     }
 }
-& $pythonPath -m PyInstaller --noconfirm --clean --windowed --onefile --name '视频倍速工坊' --collect-all customtkinter --add-binary "${ffmpegPath};tools" --add-binary "${ffprobePath};tools" --add-data "${supportPath};notices" app.py
+& $pythonPath -m PyInstaller --noconfirm --clean --windowed --onefile --distpath $distributionPath --name '视频倍速工坊' --collect-all customtkinter --add-binary "${ffmpegPath};tools" --add-binary "${ffprobePath};tools" --add-data "${supportPath};notices" app.py
 if ($LASTEXITCODE -ne 0) { throw '打包失败。' }
-$executablePath = Join-Path $PSScriptRoot 'dist\视频倍速工坊.exe'
-Compress-Archive -LiteralPath $supportPath -DestinationPath (Join-Path $PSScriptRoot 'dist\许可证与说明.zip') -Force
+$executablePath = Join-Path $distributionPath '视频倍速工坊.exe'
+Compress-Archive -LiteralPath $supportPath -DestinationPath (Join-Path $distributionPath '许可证与说明.zip') -Force
 Write-Output "单文件版已生成：$executablePath"
