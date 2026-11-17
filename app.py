@@ -35,6 +35,9 @@ class App(ctk.CTk):
         self.image_format = tk.StringVar(value='自动（JPG/WebP）')
         self.image_limit = tk.StringVar(value='200')
         self.image_resize = tk.BooleanVar(value=False)
+        self.image_width = tk.StringVar(value='')
+        self.image_height = tk.StringVar(value='')
+        self.image_aspect = tk.BooleanVar(value=True)
         self.paths = {}
         self.events = queue.Queue()
         self.converter = None
@@ -132,13 +135,13 @@ class App(ctk.CTk):
         right.grid(row=0, column=1, sticky='nsew')
         right.grid_columnconfigure(0, weight=1)
         self.build_settings(right)
-        self.label(right, '03   保存位置', 17, bold=True).grid(row=9, column=0, sticky='w', padx=20, pady=(8, 12))
+        self.label(right, '03   保存位置', 17, bold=True).grid(row=11 if self.is_image else 9, column=0, sticky='w', padx=20, pady=(8, 12))
         location = ctk.CTkEntry(right, textvariable=self.output, placeholder_text='添加文件后自动设置', height=36,
                                font=('Microsoft YaHei UI', 12))
-        location.grid(row=10, column=0, sticky='ew', padx=20)
+        location.grid(row=12 if self.is_image else 10, column=0, sticky='ew', padx=20)
         self.controls.append(location)
-        self.button(right, '选择保存文件夹', self.choose_output, width=260).grid(row=11, column=0, sticky='ew', padx=20, pady=(10, 12))
-        self.label(right, ('原图保留 · 重名自动编号\n不处理动图或多页图片' if self.is_image else '统一导出为 MP4 · 原视频保留\n重名自动编号 · 全程本地处理'), 12, MUTED, justify='left').grid(row=12, column=0, sticky='w', padx=20, pady=(0, 18))
+        self.button(right, '选择保存文件夹', self.choose_output, width=260).grid(row=13 if self.is_image else 11, column=0, sticky='ew', padx=20, pady=(10, 12))
+        self.label(right, ('原图保留 · 重名自动编号\n不处理动图或多页图片' if self.is_image else '统一导出为 MP4 · 原视频保留\n重名自动编号 · 全程本地处理'), 12, MUTED, justify='left').grid(row=14 if self.is_image else 12, column=0, sticky='w', padx=20, pady=(0, 18))
 
         footer = ctk.CTkFrame(self, fg_color='white', corner_radius=14)
         footer.grid(row=2, column=0, sticky='ew', padx=28, pady=(16, 22))
@@ -192,23 +195,38 @@ class App(ctk.CTk):
     def build_settings(self, right):
         if self.is_image:
             self.label(right, '02   压缩设置', 17, bold=True).grid(row=0, column=0, sticky='w', padx=20, pady=(18, 12))
-            for row, title, variable in ((1, '每张最大体积（KB，0 为不限）', self.image_limit),
-                                         (3, '画质上限（10～95）', self.image_quality)):
+            for row, title, variable in ((2, '每张最大体积（KB，0 为不限）', self.image_limit),
+                                         (4, '画质上限（10～95）', self.image_quality)):
                 self.label(right, title, 13, MUTED).grid(row=row, column=0, sticky='w', padx=20)
                 entry = ctk.CTkEntry(right, textvariable=variable, height=36, font=('Microsoft YaHei UI', 14))
                 entry.grid(row=row+1, column=0, sticky='ew', padx=20, pady=(8, 16))
                 self.controls.append(entry)
-            self.label(right, '输出格式', 13, MUTED).grid(row=5, column=0, sticky='w', padx=20)
+            self.label(right, '输出格式', 13, MUTED).grid(row=6, column=0, sticky='w', padx=20)
             option = ctk.CTkOptionMenu(right, values=['自动（JPG/WebP）', '原格式', 'JPEG', 'PNG', 'WebP'], variable=self.image_format,
                                       fg_color='#EAF0FF', button_color='#DCE6FC', text_color=INK, height=36)
-            option.grid(row=6, column=0, sticky='ew', padx=20, pady=(8, 12))
+            option.grid(row=7, column=0, sticky='ew', padx=20, pady=(8, 12))
             self.controls.append(option)
             resize = ctk.CTkCheckBox(right, text='允许缩小尺寸以满足体积', variable=self.image_resize,
                                      font=('Microsoft YaHei UI', 12), checkbox_width=18, checkbox_height=18)
-            resize.grid(row=7, column=0, sticky='w', padx=20, pady=(0, 10))
+            resize.grid(row=8, column=0, sticky='w', padx=20, pady=(0, 10))
             self.controls.append(resize)
             self.label(right, '默认保留像素尺寸，自动降低画质。\n压不到上限会提示，不保存超标文件。',
-                       12, MUTED, justify='left').grid(row=8, column=0, sticky='w', padx=20, pady=(0, 12))
+                       12, MUTED, justify='left').grid(row=9, column=0, sticky='w', padx=20, pady=(0, 12))
+            resolution = ctk.CTkFrame(right, fg_color='transparent')
+            resolution.grid(row=1, column=0, sticky='ew', padx=20, pady=(0, 14))
+            self.label(resolution, '分辨率（宽 × 高，像素）', 13, MUTED).pack(anchor='w')
+            inputs = ctk.CTkFrame(resolution, fg_color='transparent')
+            inputs.pack(fill='x', pady=(8, 10))
+            for variable, placeholder in ((self.image_width, '宽度'), (self.image_height, '高度')):
+                entry = ctk.CTkEntry(inputs, textvariable=variable, placeholder_text=placeholder, width=105, height=36)
+                entry.pack(side='left', padx=(0, 10))
+                self.controls.append(entry)
+            aspect = ctk.CTkCheckBox(resolution, text='保持比例', variable=self.image_aspect,
+                                    font=('Microsoft YaHei UI', 12), checkbox_width=18, checkbox_height=18)
+            aspect.pack(anchor='w')
+            self.controls.append(aspect)
+            self.label(resolution, '留空保留原尺寸；只填一边自动计算。\n同时填写时等比放入指定范围。\n关闭保持比例可强制宽高，可能变形。\n指定宽高后，不再为体积自动缩小。',
+                       11, MUTED, justify='left').pack(anchor='w', pady=(8, 0))
             return
         self.label(right, '02   设置倍速', 17, bold=True).grid(row=0, column=0, sticky='w', padx=20, pady=(18, 12))
         self.label(right, '播放速度', 13, MUTED).grid(row=1, column=0, sticky='w', padx=20)
@@ -329,7 +347,8 @@ class App(ctk.CTk):
             if not self.paths:
                 raise ValueError(f'请先添加{self.media_name}或文件夹。')
             image_options = validate_image_options(self.image_quality.get(), 0, self.image_format.get(),
-                                                  self.image_limit.get(), self.image_resize.get()) if self.is_image else None
+                                                  self.image_limit.get(), self.image_resize.get(),
+                                                  self.image_width.get(), self.image_height.get(), self.image_aspect.get()) if self.is_image else None
             speed = 1 if self.is_image else validate_speed(self.speed.get().strip())
             if not self.output.get().strip():
                 raise ValueError('请选择保存文件夹。')

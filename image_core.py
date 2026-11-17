@@ -13,9 +13,11 @@ from core import Cancelled
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tif', '.tiff'}
 
 
-def validate_image_options(quality, max_edge, output_format, target_kb=0, allow_resize=False):
+def validate_image_options(quality, max_edge, output_format, target_kb=0, allow_resize=False,
+                           width=0, height=0, keep_aspect=True):
     try:
         quality, max_edge, target_kb = int(quality), int(max_edge), int(target_kb)
+        width, height = int(width or 0), int(height or 0)
     except (TypeError, ValueError):
         raise ValueError('画质、最长边和文件体积请输入整数。') from None
     if not 10 <= quality <= 95:
@@ -24,10 +26,30 @@ def validate_image_options(quality, max_edge, output_format, target_kb=0, allow_
         raise ValueError('最长边请输入 0～20000 的整数，0 表示不缩放。')
     if not 0 <= target_kb <= 102400:
         raise ValueError('文件体积请输入 0～102400 KB，0 表示不限制。')
+    if not 0 <= width <= 20000 or not 0 <= height <= 20000:
+        raise ValueError('宽高请输入 0～20000 的整数，0 或留空表示未指定。')
+    if width and height and width * height > 40_000_000:
+        raise ValueError('输出分辨率不能超过 4000 万像素。')
+    if not keep_aspect and bool(width) != bool(height):
+        raise ValueError('关闭保持比例时，请同时填写宽度和高度。')
     if output_format not in ('自动（JPG/WebP）', '原格式', 'JPEG', 'PNG', 'WebP'):
         raise ValueError('不支持的输出格式。')
     return dict(quality=quality, max_edge=max_edge, output_format=output_format,
-                target_kb=target_kb, allow_resize=bool(allow_resize))
+                target_kb=target_kb, allow_resize=bool(allow_resize), width=width, height=height,
+                keep_aspect=bool(keep_aspect))
+
+
+def output_dimensions(size, width=0, height=0, keep_aspect=True):
+    if not width and not height:
+        return size
+    if keep_aspect:
+        factor = min([value / original for value, original in zip((width, height), size) if value])
+        result = (max(1, round(size[0] * factor)), max(1, round(size[1] * factor)))
+    else:
+        result = (width, height)
+    if max(result) > 20000 or result[0] * result[1] > 40_000_000:
+        raise ValueError('输出分辨率过大：最长边不能超过 20000，像素总数不能超过 4000 万。')
+    return result
 
 
 class ImageCompressor:
@@ -42,8 +64,9 @@ class ImageCompressor:
             raise Cancelled()
 
     def compress(self, source, output_dir, quality=80, max_edge=0, output_format='原格式', progress=lambda x: None,
-                 target_kb=0, allow_resize=False):
-        validate_image_options(quality, max_edge, output_format, target_kb, allow_resize)
+                 target_kb=0, allow_resize=False, width=0, height=0, keep_aspect=True):
+        config = validate_image_options(quality, max_edge, output_format, target_kb, allow_resize, width, height, keep_aspect)
+        width, height = config['width'], config['height']
         source, output_dir = Path(source).resolve(strict=True), Path(output_dir)
         self.check_cancel()
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -63,6 +86,9 @@ class ImageCompressor:
                 image.load()
                 self.check_cancel()
                 progress(.25)
+                dimensions = output_dimensions(image.size, width, height, keep_aspect)
+                if dimensions != image.size:
+                    image = image.resize(dimensions, Image.Resampling.LANCZOS)
                 if max_edge:
                     image.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
                 icc = image.info.get('icc_profile')
@@ -86,7 +112,7 @@ class ImageCompressor:
                     options = dict(quality=quality, method=6)
                 if icc:
                     options['icc_profile'] = icc
-                if (target_kb and output_format == '自动（JPG/WebP）' and not max_edge
+                if (target_kb and output_format == '自动（JPG/WebP）' and not max_edge and not (width or height)
                         and original.format in ('JPEG', 'PNG', 'WEBP')
                         and source.stat().st_size <= target_kb * 1024):
                     shutil.copyfile(source, temporary)
@@ -116,6 +142,8 @@ class ImageCompressor:
                         if best is not None:
                             temporary.write_bytes(best)
                             break
+                        if width or height:
+                            raise ValueError(f'指定分辨率下无法压到 {target_kb} KB。请增大体积上限或降低分辨率。')
                         if not allow_resize or image.size == (1, 1):
                             raise ValueError(f'无法压到 {target_kb} KB 以内。可选择自动格式、增大体积上限，或允许缩小尺寸。')
                         image = image.resize((max(1, int(image.width * .8)), max(1, int(image.height * .8))),

@@ -15,6 +15,8 @@ messagebox.showinfo = lambda *args: None
 messagebox.showerror = lambda *args: (_ for _ in ()).throw(AssertionError(args))
 app = App()
 app.switch_mode('图片压缩')
+app.image_width.set('640')
+app.image_height.set('480')
 app.add_paths([bad, source, source])
 app.output.set(str(root / 'output'))
 app.switch_mode('视频倍速')
@@ -43,6 +45,8 @@ def wait():
     assert statuses[0].startswith('失败'), statuses
     assert statuses[1].startswith('完成'), statuses
     assert app.last_log.is_file()
+    with Image.open(sorted((root/'output').glob('照片_压缩*'), key=lambda p:p.stat().st_mtime)[-1]) as result:
+        assert result.size == (640, 427), result.size
     assert app.start_btn.cget('state') == 'normal'
     app.switch_mode('视频倍速')
     app.switch_mode('图片压缩')

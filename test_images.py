@@ -126,6 +126,31 @@ class ImageTests(unittest.TestCase):
         result = ImageCompressor().compress(source, self.out, output_format='自动（JPG/WebP）', target_kb=200)
         self.assertEqual(result.read_bytes(), source.read_bytes())
 
+    def test_resolution_modes_and_small_file(self):
+        source = self.root / '尺寸.png'
+        Image.new('RGB', (600, 400), 'red').save(source)
+        for width, height, keep, expected in ((300, 0, True, (300, 200)),
+                (0, 100, True, (150, 100)), (300, 300, True, (300, 200)),
+                (300, 300, False, (300, 300)), (1200, 800, False, (1200, 800))):
+            with self.subTest(expected=expected):
+                result = ImageCompressor().compress(source, self.out, output_format='自动（JPG/WebP）',
+                    target_kb=200, width=width, height=height, keep_aspect=keep)
+                with Image.open(result) as image:
+                    self.assertEqual(image.size, expected)
+
+    def test_fixed_resolution_never_silently_shrinks(self):
+        source = self.root / '噪点.png'
+        Image.effect_noise((500, 500), 90).save(source)
+        with self.assertRaisesRegex(ValueError, '指定分辨率'):
+            ImageCompressor().compress(source, self.out, target_kb=1, width=300, height=300,
+                                       keep_aspect=False, allow_resize=True)
+        self.assertEqual(list(self.out.iterdir()), [])
+
+    def test_resolution_validation(self):
+        for dimensions in ((-1, 20, True), (20001, 1, True), (100, 0, False), (20000, 20000, False)):
+            with self.assertRaises(ValueError):
+                validate_image_options(80, 0, 'PNG', width=dimensions[0], height=dimensions[1], keep_aspect=dimensions[2])
+
 
 if __name__ == '__main__':
     unittest.main()
