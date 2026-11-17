@@ -53,16 +53,16 @@ def tempo_filter(speed: float) -> str:
     return 'asetpts=PTS-STARTPTS,' + ','.join(f'atempo={x:.12g}' for x in factors)
 
 
-def collect_folder(folder: Path, recursive: bool, excluded: Path | None = None, cancel=None):
+def collect_folder(folder: Path, recursive: bool, excluded: Path | None = None, cancel=None, extensions=None):
     """Do not follow directory links or re-import our default output directory."""
     result = []
     folder = folder.resolve()
     for current, dirs, files in os.walk(folder, followlinks=False):
         if cancel and cancel.is_set():
             raise Cancelled()
-        dirs[:] = sorted(d for d in dirs if d != '倍速输出' and not (Path(current) / d).is_symlink()
+        dirs[:] = sorted(d for d in dirs if d not in ('倍速输出', '图片压缩输出') and not (Path(current) / d).is_symlink()
                          and (excluded is None or (Path(current) / d).resolve() != excluded.resolve()))
-        result.extend(Path(current) / f for f in sorted(files) if Path(f).suffix.lower() in EXTENSIONS)
+        result.extend(Path(current) / f for f in sorted(files) if Path(f).suffix.lower() in (EXTENSIONS if extensions is None else extensions))
         if not recursive:
             break
     return result

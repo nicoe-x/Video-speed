@@ -1,10 +1,11 @@
 # Video-speed
 
-Windows 视频批量倍速工具。
+Windows 视频批量倍速、图片批量压缩工具。
 
 - 添加多个视频或整个文件夹，支持子目录。
 - 倍速范围 0.25～16，可保留声音或静音。
 - 结果另存为 MP4，原文件不变，重名自动编号。
+- 图片支持 JPG、PNG、WebP、BMP、TIFF，可调画质、格式和最长边。
 
 添加视频，设置倍速和保存位置，点击「开始批量处理」。操作说明见 [使用说明](使用说明.md)。
 
@@ -35,7 +36,7 @@ python -m venv .venv
 ## 测试
 
 ```powershell
-.\.venv\Scripts\python.exe -m unittest -v test_conversion
+.\.venv\Scripts\python.exe -m unittest -v test_conversion test_images
 ```
 
 测试视频由脚本生成。界面测试见 `verify_ui.py`，需 Windows 桌面及系统 Python 安装 Pillow。

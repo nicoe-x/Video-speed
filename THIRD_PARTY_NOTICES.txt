@@ -16,6 +16,7 @@ Upstream source: https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz
 Filter reference: https://ffmpeg.org/ffmpeg-filters.html
 
 CustomTkinter: https://github.com/TomSchimansky/CustomTkinter (MIT)
+Pillow: https://python-pillow.org/ (HPND and bundled dependency licenses)
 Darkdetect: https://github.com/albertosottile/darkdetect (BSD-3-Clause)
 Python: https://www.python.org/ (PSF license)
 Tcl/Tk: https://www.tcl.tk/ (BSD-style license)
