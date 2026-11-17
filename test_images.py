@@ -95,6 +95,37 @@ class ImageTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 validate_image_options(*args)
 
+    def test_target_bytes_preserves_dimensions(self):
+        source = self.root / '照片.jpg'
+        Image.effect_noise((900, 600), 60).convert('RGB').save(source, quality=98)
+        result = ImageCompressor().compress(source, self.out, output_format='自动（JPG/WebP）', target_kb=120)
+        self.assertLessEqual(result.stat().st_size, 120 * 1024)
+        with Image.open(result) as image:
+            self.assertEqual(image.size, (900, 600))
+
+    def test_target_failure_never_exports_oversize(self):
+        source = self.root / '噪点.png'
+        Image.effect_noise((500, 500), 90).save(source)
+        with self.assertRaisesRegex(ValueError, '无法压到'):
+            ImageCompressor().compress(source, self.out, target_kb=2)
+        self.assertEqual(list(self.out.iterdir()), [])
+        result = ImageCompressor().compress(source, self.out, target_kb=2, allow_resize=True)
+        self.assertLessEqual(result.stat().st_size, 2048)
+
+    def test_target_transparency(self):
+        source = self.root / '透明.png'
+        Image.new('RGBA', (100, 60), (50, 30, 40, 30)).save(source, compress_level=0)
+        result = ImageCompressor().compress(source, self.out, output_format='自动（JPG/WebP）', target_kb=10)
+        self.assertEqual(result.suffix, '.webp')
+        with Image.open(result) as image:
+            self.assertEqual(image.getpixel((0, 0))[3], 30)
+
+    def test_target_small_original_keeps_data(self):
+        source = self.root / '小图.png'
+        Image.new('RGB', (20, 20), 'blue').save(source)
+        result = ImageCompressor().compress(source, self.out, output_format='自动（JPG/WebP）', target_kb=200)
+        self.assertEqual(result.read_bytes(), source.read_bytes())
+
 
 if __name__ == '__main__':
     unittest.main()

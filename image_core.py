@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 nicoe-x
 import os
+import io
 from pathlib import Path
 import shutil
 import threading
@@ -12,18 +13,21 @@ from core import Cancelled
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tif', '.tiff'}
 
 
-def validate_image_options(quality, max_edge, output_format):
+def validate_image_options(quality, max_edge, output_format, target_kb=0, allow_resize=False):
     try:
-        quality, max_edge = int(quality), int(max_edge)
+        quality, max_edge, target_kb = int(quality), int(max_edge), int(target_kb)
     except (TypeError, ValueError):
-        raise ValueError('画质和最长边请输入整数。') from None
+        raise ValueError('画质、最长边和文件体积请输入整数。') from None
     if not 10 <= quality <= 95:
         raise ValueError('图片画质请输入 10～95 的整数。')
     if not 0 <= max_edge <= 20000:
         raise ValueError('最长边请输入 0～20000 的整数，0 表示不缩放。')
-    if output_format not in ('原格式', 'JPEG', 'PNG', 'WebP'):
+    if not 0 <= target_kb <= 102400:
+        raise ValueError('文件体积请输入 0～102400 KB，0 表示不限制。')
+    if output_format not in ('自动（JPG/WebP）', '原格式', 'JPEG', 'PNG', 'WebP'):
         raise ValueError('不支持的输出格式。')
-    return dict(quality=quality, max_edge=max_edge, output_format=output_format)
+    return dict(quality=quality, max_edge=max_edge, output_format=output_format,
+                target_kb=target_kb, allow_resize=bool(allow_resize))
 
 
 class ImageCompressor:
@@ -37,8 +41,9 @@ class ImageCompressor:
         if self.cancelled.is_set():
             raise Cancelled()
 
-    def compress(self, source, output_dir, quality=80, max_edge=0, output_format='原格式', progress=lambda x: None):
-        validate_image_options(quality, max_edge, output_format)
+    def compress(self, source, output_dir, quality=80, max_edge=0, output_format='原格式', progress=lambda x: None,
+                 target_kb=0, allow_resize=False):
+        validate_image_options(quality, max_edge, output_format, target_kb, allow_resize)
         source, output_dir = Path(source).resolve(strict=True), Path(output_dir)
         self.check_cancel()
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -47,7 +52,10 @@ class ImageCompressor:
             with Image.open(source) as original:
                 if getattr(original, 'n_frames', 1) > 1:
                     raise ValueError('不处理动图或多页图片，请先导出为单张图片。')
-                fmt = {'原格式': original.format, 'WebP': 'WEBP'}.get(output_format, output_format)
+                if output_format == '自动（JPG/WebP）':
+                    fmt = 'WEBP' if ('A' in original.getbands() or 'transparency' in original.info) else 'JPEG'
+                else:
+                    fmt = {'原格式': original.format, 'WebP': 'WEBP'}.get(output_format, output_format)
                 if fmt not in ('JPEG', 'PNG', 'WEBP'):
                     fmt = 'PNG'
                 image = ImageOps.exif_transpose(original)
@@ -78,13 +86,49 @@ class ImageCompressor:
                     options = dict(quality=quality, method=6)
                 if icc:
                     options['icc_profile'] = icc
-                image.save(temporary, format=fmt, **options)
+                if (target_kb and output_format == '自动（JPG/WebP）' and not max_edge
+                        and original.format in ('JPEG', 'PNG', 'WEBP')
+                        and source.stat().st_size <= target_kb * 1024):
+                    shutil.copyfile(source, temporary)
+                    fmt = original.format
+                elif target_kb:
+                    limit = target_kb * 1024
+                    while True:
+                        self.check_cancel()
+                        best = None
+                        if fmt == 'PNG':
+                            buffer = io.BytesIO()
+                            image.save(buffer, format=fmt, **options)
+                            if buffer.tell() <= limit:
+                                best = buffer.getvalue()
+                        else:
+                            low, high = 10, quality
+                            while low <= high:
+                                self.check_cancel()
+                                q = (low + high) // 2
+                                buffer = io.BytesIO()
+                                image.save(buffer, format=fmt, **dict(options, quality=q))
+                                if buffer.tell() <= limit:
+                                    best = buffer.getvalue()
+                                    low = q + 1
+                                else:
+                                    high = q - 1
+                        if best is not None:
+                            temporary.write_bytes(best)
+                            break
+                        if not allow_resize or image.size == (1, 1):
+                            raise ValueError(f'无法压到 {target_kb} KB 以内。可选择自动格式、增大体积上限，或允许缩小尺寸。')
+                        image = image.resize((max(1, int(image.width * .8)), max(1, int(image.height * .8))),
+                                             Image.Resampling.LANCZOS)
+                else:
+                    image.save(temporary, format=fmt, **options)
                 self.check_cancel()
                 progress(.9)
                 # An already optimized original should not become a larger export.
                 if (output_format == '原格式' and fmt == original.format and image.size == original_size
                         and temporary.stat().st_size >= source.stat().st_size):
-                    shutil.copyfile(source, temporary)
+                    if not target_kb or source.stat().st_size <= target_kb * 1024:
+                        shutil.copyfile(source, temporary)
             self.check_cancel()
             suffix = {'JPEG': '.jpg', 'PNG': '.png', 'WEBP': '.webp'}[fmt]
             index = 0
