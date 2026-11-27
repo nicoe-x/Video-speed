@@ -60,7 +60,7 @@ def collect_folder(folder: Path, recursive: bool, excluded: Path | None = None, 
     for current, dirs, files in os.walk(folder, followlinks=False):
         if cancel and cancel.is_set():
             raise Cancelled()
-        dirs[:] = sorted(d for d in dirs if d not in ('倍速输出', '图片压缩输出') and not (Path(current) / d).is_symlink()
+        dirs[:] = sorted(d for d in dirs if d not in ('倍速输出', '图片压缩输出', '封面输出') and not (Path(current) / d).is_symlink()
                          and (excluded is None or (Path(current) / d).resolve() != excluded.resolve()))
         result.extend(Path(current) / f for f in sorted(files) if Path(f).suffix.lower() in (EXTENSIONS if extensions is None else extensions))
         if not recursive:

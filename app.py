@@ -11,6 +11,7 @@ from tkinter import filedialog, messagebox, ttk
 
 import customtkinter as ctk
 from image_core import ImageCompressor, IMAGE_EXTENSIONS, validate_image_options
+from cover_core import CoverMaker, validate_cover_options
 from core import Cancelled, Converter, EXTENSIONS, binary, collect_folder, validate_speed
 
 BG = '#F4F6FA'
@@ -38,6 +39,9 @@ class App(ctk.CTk):
         self.image_width = tk.StringVar(value='')
         self.image_height = tk.StringVar(value='')
         self.image_aspect = tk.BooleanVar(value=True)
+        self.cover_platform = tk.StringVar(value='同时导出两种')
+        self.cover_framing = tk.StringVar(value='留白保留全图')
+        self.cover_size = tk.StringVar(value='标准尺寸')
         self.paths = {}
         self.events = queue.Queue()
         self.converter = None
@@ -74,7 +78,7 @@ class App(ctk.CTk):
         header = ctk.CTkFrame(self, fg_color='transparent')
         header.grid(row=0, column=0, sticky='ew', padx=28, pady=(22, 16))
         self.label(header, '视频倍速工坊', 27, bold=True).pack(side='left')
-        modes = ctk.CTkSegmentedButton(header, values=['视频倍速', '图片压缩'], command=self.switch_mode,
+        modes = ctk.CTkSegmentedButton(header, values=['视频倍速', '图片压缩', '封面制作'], command=self.switch_mode,
                                        height=38, font=('Microsoft YaHei UI', 14), selected_color=BLUE,
                                        unselected_color=MUTED, fg_color=MUTED)
         modes.set(self.mode)
@@ -163,7 +167,11 @@ class App(ctk.CTk):
 
     @property
     def is_image(self):
-        return self.mode == '图片压缩'
+        return self.mode in ('图片压缩', '封面制作')
+
+    @property
+    def is_cover(self):
+        return self.mode == '封面制作'
 
     @property
     def media_name(self):
@@ -193,6 +201,25 @@ class App(ctk.CTk):
                 self.tree.item(key, values=values)
 
     def build_settings(self, right):
+        if self.is_cover:
+            self.label(right, '02   封面设置', 17, bold=True).grid(row=0, column=0, sticky='w', padx=20, pady=(18, 12))
+            for row, title, variable, values in (
+                (1, '导出平台', self.cover_platform, ['同时导出两种', '红果', '抖音']),
+                (4, '画面处理', self.cover_framing, ['留白保留全图', '居中裁剪']),
+                (7, '导出尺寸', self.cover_size, ['标准尺寸', '最低尺寸']),
+            ):
+                self.label(right, title, 13, MUTED).grid(row=row, column=0, sticky='w', padx=20)
+                option = ctk.CTkOptionMenu(right, values=values, variable=variable,
+                                          fg_color='#EAF0FF', button_color='#DCE6FC', text_color=INK, height=36)
+                option.grid(row=row+1, column=0, sticky='ew', padx=20, pady=(8, 12))
+                self.controls.append(option)
+            self.label(right, '红果 7:10 · 最低 350×500\n抖音 2:3 · 最低 480×720\n统一导出 JPG，每张不超过 5 MB。',
+                       12, MUTED, justify='left').grid(row=3, column=0, sticky='w', padx=20, pady=(0, 16))
+            self.label(right, '留白：白底补齐，保留完整画面。\n裁剪：居中铺满，会裁掉部分边缘。',
+                       12, MUTED, justify='left').grid(row=6, column=0, sticky='w', padx=20, pady=(0, 16))
+            self.label(right, '标准：红果 700×1000，抖音 960×1440\n最低：红果 350×500，抖音 480×720\n小图会放大，清晰度受原图限制。',
+                       11, MUTED, justify='left').grid(row=9, column=0, sticky='w', padx=20, pady=(0, 12))
+            return
         if self.is_image:
             self.label(right, '02   压缩设置', 17, bold=True).grid(row=0, column=0, sticky='w', padx=20, pady=(18, 12))
             for row, title, variable in ((2, '每张最大体积（KB，0 为不限）', self.image_limit),
@@ -282,7 +309,7 @@ class App(ctk.CTk):
             self.tree.insert('', 'end', iid=key, values=(path.name, size_text, '待处理'))
             added += 1
             if not self.output.get():
-                self.output.set(str(path.parent / ('图片压缩输出' if self.is_image else '倍速输出')))
+                self.output.set(str(path.parent / ('封面输出' if self.is_cover else '图片压缩输出' if self.is_image else '倍速输出')))
         self.count_label.configure(text=f'01   {self.media_name}列表 · {len(self.paths)} 个')
         self.status.configure(text=f'已添加 {added} 个{self.media_name}，共 {len(self.paths)} 个。')
 
@@ -346,9 +373,10 @@ class App(ctk.CTk):
         try:
             if not self.paths:
                 raise ValueError(f'请先添加{self.media_name}或文件夹。')
+            cover_options = validate_cover_options(self.cover_platform.get(), self.cover_framing.get(), self.cover_size.get()) if self.is_cover else None
             image_options = validate_image_options(self.image_quality.get(), 0, self.image_format.get(),
                                                   self.image_limit.get(), self.image_resize.get(),
-                                                  self.image_width.get(), self.image_height.get(), self.image_aspect.get()) if self.is_image else None
+                                                  self.image_width.get(), self.image_height.get(), self.image_aspect.get()) if self.is_image and not self.is_cover else None
             speed = 1 if self.is_image else validate_speed(self.speed.get().strip())
             if not self.output.get().strip():
                 raise ValueError('请选择保存文件夹。')
@@ -364,14 +392,14 @@ class App(ctk.CTk):
         self.busy = True
         self.set_locked(True)
         self.bar.set(0)
-        self.converter = ImageCompressor() if self.is_image else Converter()
+        self.converter = CoverMaker() if self.is_cover else ImageCompressor() if self.is_image else Converter()
         items = list(self.paths.items())
         for key, _ in items:
             self.tree.set(key, 'status', '等待中')
         self.status.configure(text=f'正在准备 {len(items)} 个{self.media_name}…')
-        threading.Thread(target=self.work, args=(items, output, speed, self.mute.get(), self.quality.get(), image_options), daemon=True).start()
+        threading.Thread(target=self.work, args=(items, output, speed, self.mute.get(), self.quality.get(), image_options, cover_options), daemon=True).start()
 
-    def work(self, items, output, speed, mute, quality, image_options=None):
+    def work(self, items, output, speed, mute, quality, image_options=None, cover_options=None):
         success, failed, report = 0, 0, []
         total = len(items)
         for index, (key, path) in enumerate(items):
@@ -381,7 +409,13 @@ class App(ctk.CTk):
             self.events.put(('status', f'正在处理 {index + 1}/{total}：{path.name}'))
             try:
                 update = lambda value, i=index: self.events.put(('progress', (i + value) / total))
-                if image_options is not None:
+                if cover_options is not None:
+                    results = self.converter.make(path, output, progress=update, **cover_options)
+                    item_status = f'完成 · {len(results)} 张封面'
+                    sizes = ' / '.join(f'{result.stat().st_size/1024:.0f} KB' for result in results)
+                    self.events.put(('size', key, sizes))
+                    report.append(f'成功：{path}\n' + ''.join(f'保存：{result}（{result.stat().st_size} 字节）\n' for result in results))
+                elif image_options is not None:
                     result = self.converter.compress(path, output, progress=update, **image_options)
                     before, after = path.stat().st_size, result.stat().st_size
                     ratio = (1 - after / before) * 100 if before else 0
@@ -392,7 +426,8 @@ class App(ctk.CTk):
                     result = self.converter.convert(path, output, speed, mute, quality, update)
                     item_status = '已完成'
                 success += 1
-                report.append(f'成功：{path}\n保存：{result}\n')
+                if cover_options is None:
+                    report.append(f'成功：{path}\n保存：{result}\n')
                 self.events.put(('item', key, item_status))
             except Cancelled:
                 self.events.put(('item', key, '已停止'))
@@ -407,7 +442,7 @@ class App(ctk.CTk):
         try:
             from datetime import datetime
             log = output / f'处理记录_{datetime.now():%Y%m%d_%H%M%S_%f}.txt'
-            settings = f'图片压缩：{image_options}' if image_options is not None else f'倍速：{speed:g}x'
+            settings = f'封面制作：{cover_options}' if cover_options is not None else f'图片压缩：{image_options}' if image_options is not None else f'倍速：{speed:g}x'
             log.write_text(f'{settings}\n成功 {success}，失败 {failed}，未完成 {total-success-failed}\n\n' + '\n'.join(report), encoding='utf-8-sig')
         except OSError as exc:
             log = None
